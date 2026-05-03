@@ -1,0 +1,44 @@
+name: Agente de Cobranca JK
+
+on:
+  schedule:
+    # 10:00 UTC = 07:00 BRT (seg a sab)
+    - cron: '0 10 * * 1-6'
+  workflow_dispatch:  # permite rodar manualmente
+
+jobs:
+  cobranca:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install gspread google-auth gspread-formatting \
+                      google-api-python-client openpyxl httpx reportlab
+
+      - name: Criar credenciais
+        run: |
+          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credenciais_google.json
+
+      - name: Criar drive_ids.json
+        run: |
+          cat > drive_ids.json << 'EOF'
+          {
+            "pasta_jk":       "1uSmugzsaiEzgaIFo-3hR9CbLeNDx4f8d",
+            "pasta_cobranca": "1L3Dtq9Oa4S0WMOJvrVXhsYdqWGKQ85xO",
+            "pasta_entrada":  "1Hd5KExgFp4DHEYU5IpN91oOkziOZfc9C",
+            "planilha_id":    "1cyJcx99hr0_HoWxkYJGt6dThOJCqKuzUWqqPRiFCWzw"
+          }
+          EOF
+
+      - name: Rodar agente
+        run: python rodar.py

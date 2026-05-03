@@ -1,0 +1,27 @@
+# Credenciais - NUNCA commitar
+credenciais_google.json
+*.json.bak
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Saida local (gerada pelos scripts)
+pdfs/
+cobranca_*.txt
+cobranca_*.csv
+planilha_url.txt
+
+# Editores / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
