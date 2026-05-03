@@ -26,8 +26,16 @@ jobs:
                       google-api-python-client openpyxl httpx reportlab
 
       - name: Criar credenciais
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
-          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credenciais_google.json
+          if [ -z "$GOOGLE_CREDENTIALS" ]; then
+            echo "ERRO: secret GOOGLE_CREDENTIALS nao esta configurada" >&2
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_CREDENTIALS" > credenciais_google.json
+          python -c "import json; json.load(open('credenciais_google.json'))" \
+            || { echo "ERRO: GOOGLE_CREDENTIALS nao e JSON valido" >&2; exit 1; }
 
       - name: Criar drive_ids.json
         run: |
