@@ -2,8 +2,8 @@
 Orquestrador principal - Agente de Cobranca JK
 Executa tudo em sequencia:
   1. Processa dados + atualiza Google Sheets
-  2. Gera PDF executivo + faz upload para a pasta Cobranca no Drive
-  3. Envia resumo no WhatsApp (com link do PDF)
+  2. Gera PDF executivo em pdfs/ (no GitHub Actions vira artifact)
+  3. Envia resumo no WhatsApp
 """
 
 import asyncio
@@ -28,7 +28,6 @@ async def main():
     erros = []
     planilha_ok = False
     resultado = None
-    link_pdf = None
 
     # 1. Processar + Atualizar planilha
     try:
@@ -45,13 +44,12 @@ async def main():
         traceback.print_exc()
         erros.append(f"planilha: {e}")
 
-    # 2. Gerar PDF + upload Drive
+    # 2. Gerar PDF (vai para pdfs/ - no Actions vira artifact)
     if planilha_ok:
         try:
-            log("\nPasso 2/3 - Gerando PDF e enviando para o Drive...")
+            log("\nPasso 2/3 - Gerando PDF executivo...")
             from analises import montar_analise_completa
             from gerar_pdf import gerar as gerar_pdf
-            from upload_drive import carregar_ids, upload_arquivo
 
             analise = montar_analise_completa(
                 resultado['resumo_v'], resultado['resumo_av'],
@@ -59,11 +57,9 @@ async def main():
                 resultado['snapshot_anterior'], resultado['clientes_ontem'],
             )
             caminho_pdf = gerar_pdf(resultado, analise)
-            ids = carregar_ids()
-            link_pdf = upload_arquivo(caminho_pdf, ids["pasta_cobranca"])
-            log(f"PDF no Drive: {link_pdf}")
+            log(f"PDF gerado em: {caminho_pdf}")
         except Exception as e:
-            log(f"ERRO no PDF/upload: {e}")
+            log(f"ERRO no PDF: {e}")
             traceback.print_exc()
             erros.append(f"pdf: {e}")
     else:
@@ -79,7 +75,6 @@ async def main():
             await enviar(
                 resultado['resumo_v'], resultado['resumo_av'],
                 resultado['total_v'], resultado['total_av'],
-                link_pdf=link_pdf,
             )
         except Exception as e:
             log(f"ERRO no WhatsApp: {e}")

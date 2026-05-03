@@ -33,14 +33,18 @@ def upload_arquivo(caminho_local, pasta_id, mimetype="application/pdf"):
     nome = os.path.basename(caminho_local)
 
     q = f"name='{nome}' and '{pasta_id}' in parents and trashed=false"
-    res = service.files().list(q=q, fields="files(id,name)").execute()
+    res = service.files().list(
+        q=q, fields="files(id,name)",
+        supportsAllDrives=True, includeItemsFromAllDrives=True,
+    ).execute()
     for arq in res.get("files", []):
-        service.files().delete(fileId=arq["id"]).execute()
+        service.files().delete(fileId=arq["id"], supportsAllDrives=True).execute()
 
     media = MediaFileUpload(caminho_local, mimetype=mimetype, resumable=False)
     meta = {"name": nome, "parents": [pasta_id]}
     arq = service.files().create(
         body=meta, media_body=media, fields="id,webViewLink",
+        supportsAllDrives=True,
     ).execute()
     return arq["webViewLink"]
 
