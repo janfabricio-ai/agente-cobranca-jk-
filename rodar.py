@@ -30,6 +30,7 @@ async def main():
     resultado = None
 
     # 1. Processar + Atualizar planilha
+    arquivo_faltando = None
     try:
         log("\nPasso 1/3 - Processando dados e atualizando planilha...")
         from atualizar_planilha import main as atualizar
@@ -39,6 +40,16 @@ async def main():
             log("Planilha atualizada com sucesso")
         else:
             erros.append("atualizar_planilha nao retornou dados")
+    except FileNotFoundError as e:
+        log(f"ERRO na planilha (arquivo faltando): {e}")
+        erros.append(f"planilha: {e}")
+        msg = str(e).lower()
+        if "mubys" in msg:
+            arquivo_faltando = "mubys.xls"
+        elif "zenetti" in msg:
+            arquivo_faltando = "zenetti.csv"
+        else:
+            arquivo_faltando = str(e)
     except Exception as e:
         log(f"ERRO na planilha: {e}")
         traceback.print_exc()
@@ -67,7 +78,17 @@ async def main():
 
     # 3. Enviar WhatsApp (somente se planilha OK)
     if not planilha_ok:
-        log("\nPasso 3/3 - WhatsApp PULADO (planilha falhou, evitando envio vazio)")
+        if arquivo_faltando:
+            try:
+                log(f"\nPasso 3/3 - Enviando alerta WhatsApp ({arquivo_faltando} faltando)...")
+                from enviar_whatsapp import enviar_alerta_arquivo_faltando
+                await enviar_alerta_arquivo_faltando(arquivo_faltando)
+            except Exception as e:
+                log(f"ERRO no alerta WhatsApp: {e}")
+                traceback.print_exc()
+                erros.append(f"alerta_whatsapp: {e}")
+        else:
+            log("\nPasso 3/3 - WhatsApp PULADO (planilha falhou, evitando envio vazio)")
     else:
         try:
             log("\nPasso 3/3 - Enviando WhatsApp...")

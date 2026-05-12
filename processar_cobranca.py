@@ -50,6 +50,9 @@ def baixar_arquivo(service, pasta_id, nome_arquivo):
         return None, None
     file_id = arquivos[0]["id"]
     modified = arquivos[0].get("modifiedTime", "")
+    return _baixar_por_id(service, file_id), modified
+
+def _baixar_por_id(service, file_id):
     request = service.files().get_media(fileId=file_id)
     buf = io.BytesIO()
     downloader = MediaIoBaseDownload(buf, request)
@@ -57,7 +60,28 @@ def baixar_arquivo(service, pasta_id, nome_arquivo):
     while not done:
         _, done = downloader.next_chunk()
     buf.seek(0)
-    return buf.read(), modified
+    return buf.read()
+
+def procurar_arquivo(service, pasta_id, padrao_regex):
+    """
+    Busca arquivo na pasta que casa com regex case-insensitive no nome.
+    Se houver mais de um, retorna o mais recente (modifiedTime).
+    Retorna (bytes, nome_real, modifiedTime) ou (None, None, None).
+    """
+    q = f"'{pasta_id}' in parents and trashed=false"
+    res = service.files().list(
+        q=q,
+        fields="files(id,name,modifiedTime)",
+        pageSize=1000,
+    ).execute()
+    arquivos = res.get("files", [])
+    rx = re.compile(padrao_regex, re.IGNORECASE)
+    candidatos = [a for a in arquivos if rx.match(a["name"])]
+    if not candidatos:
+        return None, None, None
+    candidatos.sort(key=lambda a: a.get("modifiedTime", ""), reverse=True)
+    escolhido = candidatos[0]
+    return _baixar_por_id(service, escolhido["id"]), escolhido["name"], escolhido.get("modifiedTime", "")
 
 # ─────────────────────────────────────────
 # HELPERS
@@ -401,29 +425,28 @@ def carregar_dados():
     print("Conectando ao Drive...")
     service = conectar_drive()
 
-    print("Baixando zenetti.csv...")
-    zen_bytes, _ = baixar_arquivo(service, pasta_entrada, "zenetti.csv")
+    print("Procurando zenetti (csv)...")
+    zen_bytes, zen_nome, _ = procurar_arquivo(service, pasta_entrada, r'^zenetti.*\.csv$')
     if not zen_bytes:
         raise FileNotFoundError("zenetti.csv nao encontrado na pasta Entrada do Drive")
+    print(f"  encontrado: {zen_nome}")
 
-    print("Baixando mubys.xls...")
-    mub_bytes, _ = baixar_arquivo(service, pasta_entrada, "mubys.xls")
+    print("Procurando mubys/mubisys (xls/xlsx)...")
+    mub_bytes, mub_nome, _ = procurar_arquivo(service, pasta_entrada, r'^mub[iy]?s.*\.xlsx?$')
     if not mub_bytes:
         raise FileNotFoundError("mubys.xls nao encontrado na pasta Entrada do Drive")
+    print(f"  encontrado: {mub_nome}")
 
-    print("Baixando cadastro_clientes.xlsx (opcional)...")
-    cad_bytes, _ = baixar_arquivo(service, pasta_entrada, "cadastro_clientes.xlsx")
+    print("Procurando cadastro_clientes (opcional)...")
+    cad_bytes, cad_nome, _ = procurar_arquivo(
+        service, pasta_entrada, r'^cadastro[_ ]?clientes.*\.(xlsx|csv)$'
+    )
     cadastro = {}
     if cad_bytes:
         cadastro = ler_cadastro(cad_bytes)
-        print(f"  {len(cadastro)} clientes no cadastro")
+        print(f"  encontrado: {cad_nome} ({len(cadastro)} clientes)")
     else:
-        cad_bytes2, _ = baixar_arquivo(service, pasta_entrada, "cadastro_clientes.csv")
-        if cad_bytes2:
-            cadastro = ler_cadastro(cad_bytes2)
-            print(f"  {len(cadastro)} clientes no cadastro (CSV)")
-        else:
-            print("  Cadastro nao encontrado — telefones apenas do Mubys")
+        print("  Cadastro nao encontrado — telefones apenas do Mubys")
 
     print("\nProcessando vencidos...")
     zen_venc = ler_zenetti(zen_bytes, apenas_vencidos=True)

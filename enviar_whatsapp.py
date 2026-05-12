@@ -39,6 +39,23 @@ async def enviar_mensagem(fone, texto):
         print(f"  Erro {resp.status_code}: {resp.text[:200]}")
         return False
 
+async def enviar_alerta_arquivo_faltando(arquivo_faltando):
+    """Avisa o Luiz que o relatorio de hoje nao saiu porque falta arquivo na pasta Entrada."""
+    hoje = DATA_HOJE.strftime('%d/%m/%Y')
+    texto = (
+        f"*COBRANCA JK - RELATORIO NAO ENVIADO*\n"
+        f"Data: {hoje}\n\n"
+        f"Nao consegui gerar o relatorio de hoje porque *nao encontrei o arquivo* "
+        f"`{arquivo_faltando}` na pasta Entrada do Drive.\n\n"
+        f"_Acoes:_\n"
+        f"1) Subir o arquivo `{arquivo_faltando}` na pasta Entrada\n"
+        f"2) Avisar Fabricio pra disparar o relatorio manual\n\n"
+        f"_Alerta automatico_"
+    )
+    for dest in DESTINATARIOS:
+        print(f"Enviando alerta para {dest['nome']} ({dest['fone']})...")
+        await enviar_mensagem(dest["fone"], texto)
+
 def montar_mensagem(resumo_v, resumo_av, total_v, total_av, link_pdf=None):
     hoje = DATA_HOJE.strftime('%d/%m/%Y')
     total_g = total_v + total_av
