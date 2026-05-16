@@ -28,6 +28,7 @@ async def main():
     erros = []
     planilha_ok = False
     resultado = None
+    caminho_pdf = None
 
     # 1. Processar + Atualizar planilha
     arquivo_faltando = None
@@ -96,6 +97,7 @@ async def main():
             await enviar(
                 resultado['resumo_v'], resultado['resumo_av'],
                 resultado['total_v'], resultado['total_av'],
+                pdf_path=caminho_pdf,
             )
         except Exception as e:
             log(f"ERRO no WhatsApp: {e}")

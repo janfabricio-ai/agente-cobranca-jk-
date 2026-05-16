@@ -4,8 +4,10 @@ JK Artes Graficas
 """
 
 import asyncio
+import base64
 import httpx
 import json
+import os
 import re
 import sys
 from datetime import date
@@ -37,6 +39,38 @@ async def enviar_mensagem(fone, texto):
             print(f"  Enviado para {fone}")
             return True
         print(f"  Erro {resp.status_code}: {resp.text[:200]}")
+        return False
+
+async def enviar_arquivo(fone, pdf_path, legenda=""):
+    """
+    Envia arquivo binario (PDF) via Digisac.
+    Payload: file = {base64, mimetype, name}. Formato confirmado na gem douglara/digisac.
+    """
+    if not os.path.isfile(pdf_path):
+        print(f"  PDF nao encontrado: {pdf_path}")
+        return False
+
+    with open(pdf_path, "rb") as f:
+        binario = f.read()
+
+    payload = {
+        "number": fone,
+        "serviceId": DIGISAC_SERVICE_ID,
+        "text": legenda,
+        "file": {
+            "base64": base64.b64encode(binario).decode("ascii"),
+            "mimetype": "application/pdf",
+            "name": os.path.basename(pdf_path),
+        },
+    }
+
+    url = f"{DIGISAC_BASE_URL}/messages"
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(url, content=_post_json(payload), headers=HEADERS)
+        if resp.is_success:
+            print(f"  PDF enviado para {fone} ({len(binario)/1024:.0f} KB)")
+            return True
+        print(f"  Erro PDF {resp.status_code}: {resp.text[:300]}")
         return False
 
 async def enviar_alerta_arquivo_faltando(arquivo_faltando):
@@ -103,7 +137,7 @@ def montar_mensagem(resumo_v, resumo_av, total_v, total_av, link_pdf=None):
     linhas.append("\n_Relatorio gerado automaticamente_")
     return "\n".join(linhas)
 
-async def main(resumo_v=None, resumo_av=None, total_v=None, total_av=None, link_pdf=None):
+async def main(resumo_v=None, resumo_av=None, total_v=None, total_av=None, link_pdf=None, pdf_path=None):
     print("=" * 55)
     print("  ENVIO WHATSAPP - COBRANCA JK")
     print("=" * 55)
@@ -123,9 +157,14 @@ async def main(resumo_v=None, resumo_av=None, total_v=None, total_av=None, link_
     modo_teste = "--teste" in sys.argv
     destinos = [{"nome": "Teste", "fone": "5543991134399"}] if modo_teste else DESTINATARIOS
 
+    hoje = DATA_HOJE.strftime('%d/%m/%Y')
+    legenda_pdf = f"Relatorio completo de cobranca - {hoje}"
+
     for dest in destinos:
         print(f"Enviando para {dest['nome']} ({dest['fone']})...")
         await enviar_mensagem(dest["fone"], mensagem)
+        if pdf_path:
+            await enviar_arquivo(dest["fone"], pdf_path, legenda=legenda_pdf)
 
     print("\nConcluido!")
 
