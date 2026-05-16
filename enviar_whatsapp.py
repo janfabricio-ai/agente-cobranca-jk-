@@ -19,6 +19,7 @@ DATA_HOJE          = date.today()
 
 DESTINATARIOS = [
     {"nome": "Luiz Otavio", "fone": "5543991134399"},
+    {"nome": "Fabricio",    "fone": "5543996484399"},
 ]
 
 HEADERS = {
