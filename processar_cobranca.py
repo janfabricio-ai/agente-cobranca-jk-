@@ -426,13 +426,23 @@ def carregar_dados():
     service = conectar_drive()
 
     print("Procurando zenetti (csv)...")
-    zen_bytes, zen_nome, _ = procurar_arquivo(service, pasta_entrada, r'^zenetti.*\.csv$')
+    # Aceita nome legado 'zenetti*.csv' OU nome nativo do export Zenetti
+    # ('Contas a receber por vencimento.csv')
+    zen_bytes, zen_nome, _ = procurar_arquivo(
+        service, pasta_entrada,
+        r'^(zenetti|contas[\s_-]*a[\s_-]*receber).*\.csv$'
+    )
     if not zen_bytes:
         raise FileNotFoundError("zenetti.csv nao encontrado na pasta Entrada do Drive")
     print(f"  encontrado: {zen_nome}")
 
     print("Procurando mubys/mubisys (xls/xlsx)...")
-    mub_bytes, mub_nome, _ = procurar_arquivo(service, pasta_entrada, r'^mub[iy]?s.*\.xlsx?$')
+    # Aceita nome legado 'mub*.xls' OU nome nativo do export Mubisys
+    # ('Resultado_DD_MM_YYYY.xls')
+    mub_bytes, mub_nome, _ = procurar_arquivo(
+        service, pasta_entrada,
+        r'^(mub[iy]?s|resultado[_\s-]*\d).*\.xlsx?$'
+    )
     if not mub_bytes:
         raise FileNotFoundError("mubys.xls nao encontrado na pasta Entrada do Drive")
     print(f"  encontrado: {mub_nome}")
