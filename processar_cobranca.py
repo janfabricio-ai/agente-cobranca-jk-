@@ -90,7 +90,13 @@ def limpar_valor(texto):
     if not texto:
         return 0.0
     t = re.sub(r'[R$\s]', '', str(texto))
-    t = t.replace('.', '').replace(',', '.')
+    if not t:
+        return 0.0
+    if ',' in t:
+        # Formato BR (Zenetti CSV): ponto = milhar, virgula = decimal -> "3.060,00"
+        t = t.replace('.', '').replace(',', '.')
+    # Sem virgula: ja e numero com ponto decimal (Mubisys XLSX, "3060.0") ou
+    # inteiro -> NAO remover o ponto, senao infla 10-100x.
     try:
         return float(t)
     except ValueError:
@@ -170,22 +176,47 @@ def ler_zenetti(conteudo_bytes, apenas_vencidos=True):
 # ─────────────────────────────────────────
 # LEITURA MUBYS
 # ─────────────────────────────────────────
+def _linhas_mubys(conteudo_bytes):
+    """
+    Extrai as linhas do export Mubisys em formato de lista-de-celulas (strings),
+    aceitando os DOIS formatos que o sistema ja exportou:
+      - .xls legado = HTML disfarcado (tabela <tr>/<td>)
+      - .xlsx real  = Excel OOXML (ZIP, magic 'PK') — formato novo a partir de 06/2026
+    O layout de colunas (24 cols, mesmos indices) e identico nos dois.
+    """
+    # XLSX real comeca com a assinatura ZIP 'PK\x03\x04'
+    if conteudo_bytes[:2] == b'PK':
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(conteudo_bytes), read_only=True, data_only=True)
+        ws = wb.active
+        linhas = []
+        for row in ws.iter_rows(values_only=True):
+            linhas.append(['' if c is None else str(c).strip() for c in row])
+        wb.close()
+        return linhas
+
+    # Fallback: HTML disfarcado (formato legado .xls)
+    conteudo = conteudo_bytes.decode('utf-8-sig', errors='replace')
+    linhas_tr = re.findall(r'<tr>(.*?)</tr>', conteudo, re.DOTALL)
+    linhas = []
+    for tr in linhas_tr:
+        tds = re.findall(r'<td[^>]*>(.*?)</td>', tr, re.DOTALL)
+        linhas.append([re.sub(r'<[^>]+>', '', c).strip() for c in tds])
+    return linhas
+
+
 def ler_mubys(conteudo_bytes, apenas_vencidos=True):
     """
     apenas_vencidos=True  -> status 'Vencido' (inadimplentes)
     apenas_vencidos=False -> vencimento > hoje (a vencer)
     """
     registros = []
-    conteudo = conteudo_bytes.decode('utf-8-sig', errors='replace')
-    linhas_tr = re.findall(r'<tr>(.*?)</tr>', conteudo, re.DOTALL)
-
-    for tr in linhas_tr:
-        tds = re.findall(r'<td[^>]*>(.*?)</td>', tr, re.DOTALL)
+    for tds in _linhas_mubys(conteudo_bytes):
         if len(tds) < 23:
             continue
 
         def td(i):
-            return re.sub(r'<[^>]+>', '', tds[i]).strip()
+            return tds[i] if i < len(tds) else ''
 
         status   = td(22)
         cliente  = td(0)
